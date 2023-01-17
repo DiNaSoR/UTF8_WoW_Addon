@@ -56,6 +56,71 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 local strbyte, strlen, strsub, type = string.byte, string.len, string.sub, type
 
+-- define a table of reshaping rules for Arabic characters
+local reshaping_rules = {
+	["ا"] = {isolated = "ا", initial = "ا", middle = "ﺎ", final = "ﺎ"},
+	["آ"] = {isolated = "آ", initial = "ﺁ", middle = "ﺂ", final = "ﺂ"},
+	["أ"] = {isolated = "أ", initial = "ﺃ", middle = "ﺄ", final = "ﺄ"},
+	["إ"] = {isolated = "إ", initial = "إ", middle = "ﺈ", final = "ﺈ"},
+
+	["ب"] = {isolated = "ب", initial = "ﺑ", middle = "ﺒ", final = "ﺐ"},
+	["ت"] = {isolated = "ت", initial = "ﺗ", middle = "ﺘ", final = "ﺖ"},
+	["ث"] = {isolated = "ث", initial = "ﺛ", middle = "ﺜ", final = "ﺚ"},
+
+	["ج"] = {isolated = "ج", initial = "ﺟ", middle = "ﺠ", final = "ﺞ"},
+	["ح"] = {isolated = "ح", initial = "ﺣ", middle = "ﺤ", final = "ﺢ"},
+	["خ"] = {isolated = "خ", initial = "ﺧ", middle = "ﺨ", final = "ﺦ"},
+
+	["د"] = {isolated = "د", initial = "د", middle = "ﺪ", final = "ﺪ"},
+	["ذ"] = {isolated = "ذ", initial = "ذ", middle = "ﺬ", final = "ﺬ"},
+	
+	["ر"] = {isolated = "ر", initial = "ر", middle = "ﺮ", final = "ﺮ"},
+	["ز"] = {isolated = "ز", initial = "ز", middle = "ﺰ", final = "ﺰ"},
+
+	["س"] = {isolated = "س", initial = "ﺳ", middle = "ﺴ", final = "ﺲ"},
+	["ش"] = {isolated = "ش", initial = "ﺷ", middle = "ﺸ", final = "ﺶ"},
+
+	["ص"] = {isolated = "ص", initial = "ﺻ", middle = "ﺼ", final = "ﺺ"},
+	["ض"] = {isolated = "ض", initial = "ﺿ", middle = "ﻀ", final = "ﺾ"},
+
+	["ط"] = {isolated = "ط", initial = "ﻃ", middle = "ﻂ", final = "ﻂ"},
+	["ظ"] = {isolated = "ظ", initial = "ﻇ", middle = "ﻈ", final = "ﻆ"},
+
+	["ع"] = {isolated = "ع", initial = "ﻋ", middle = "ﻌ", final = "ﻊ"},
+	["غ"] = {isolated = "غ", initial = "ﻏ", middle = "ﻐ", final = "ﻎ"},
+
+	["ف"] = {isolated = "ف", initial = "ﻓ", middle = "ﻔ", final = "ﻒ"},
+	["ق"] = {isolated = "ق", initial = "ﻗ", middle = "ﻘ", final = "ﻖ"},
+
+	["ك"] = {isolated = "ك", initial = "ﻛ", middle = "ﻜ", final = "ﻚ"},
+	["ل"] = {isolated = "ل", initial = "ﻟ", middle = "ﻠ", final = "ﻞ"},
+	["م"] = {isolated = "ﻡ", initial = "ﻣ", middle = "ﻤ", final = "ﻢ"},
+	["ن"] = {isolated = "ن", initial = "ﻧ", middle = "ﻨ", final = "ﻦ"},
+
+	["ي"] = {isolated = "ﻱ", initial = "ﻳ", middle = "ﻴ", final = "ﻲ"},
+	["ئ"] = {isolated = "ئ", initial = "ﺋ", middle = "ﺌ", final = "ﺊ"},
+	["ى"] = {isolated = "ﻯ", initial = "ﻯ", middle = "ﻯ", final = "ﻰ"},
+
+	["و"] = {isolated = "ﻭ", initial = "ﻮ", middle = "ﻮ", final = "ﻮ"},
+	["ؤ"] = {isolated = "ؤ", initial = "ﺆ", middle = "ﺆ", final = "ﺆ"},
+
+	["ه"] = {isolated = "ه", initial = "ﻫ", middle = "ﻬ", final = "ﻪ"},
+	["ة"] = {isolated = "ة", initial = "ة", middle = "ة", final = "ﺔ"},
+
+	["ﻻ"] = {isolated = "ﻻ", initial = "ﻻ", middle = "ﻼ", final = "ﻼ"},
+	["ﻵ"] = {isolated = "ﻵ", initial = "ﻵ", middle = "ﻶ", final = "ﻶ"},
+	["لأ"] = {isolated = "ﻷ", initial = "ﻷ", middle = "ﻸ", final = "ﻸ"},
+	["لإ"] = {isolated = "ﻹ", initial = "ﻹ", middle = "ﻺ", final = "ﻺ"},
+
+	["ء"] = {isolated = "ء", initial = "ﺀ", middle = "ﺀ", final = "ﺀ"},
+
+
+	
+
+     -- add more reshaping rules for other Arabic characters here
+   };
+
+
 -- returns the number of bytes used by the UTF-8 character at byte i in s
 -- also doubles as a UTF-8 character validator
 local function utf8charbytes(s, i)
@@ -284,105 +349,95 @@ end
 
 -- identical to string.reverse except that it supports UTF-8
 local function utf8reverse(s)
-    -- argument checking
-    if type(s) ~= "string" then
-        error("bad argument #1 to 'utf8reverse' (string expected, got ".. type(s).. ")")
-    end
+   -- argument checking
+   if type(s) ~= "string" then
+      error("bad argument #1 to 'utf8reverse' (string expected, got ".. type(s).. ")")
+   end
 
-    -- define a table of reshaping rules for Arabic characters
-    local reshaping_rules = {
-		["ا"] = {isolated = "ا", initial = "ا", middle = "ا", final = "ﺎ"},
-		["ب"] = {isolated = "ب", initial = "ﺑ", middle = "ﺒ", final = "ﺐ"},
-		["ت"] = {isolated = "ت", initial = "ﺗ", middle = "ﺘ", final = "ﺖ"},
-		["ث"] = {isolated = "ث", initial = "ﺛ", middle = "ﺜ", final = "ﺚ"},
-		["ج"] = {isolated = "ج", initial = "ﺟ", middle = "ﺠ", final = "ﺞ"},
-		["ح"] = {isolated = "ح", initial = "ﺣ", middle = "ﺤ", final = "ﺢ"},
-		["خ"] = {isolated = "خ", initial = "ﺧ", middle = "ﺨ", final = "ﺦ"},
-		["د"] = {isolated = "د", initial = "د", middle = "ﺪ", final = "ﺪ"},
-		["ذ"] = {isolated = "ذ", initial = "ذ", middle = "ﺬ", final = "ﺬ"},
-		["ر"] = {isolated = "ر", initial = "ر", middle = "ﺮ", final = "ﺮ"},
-		["ز"] = {isolated = "ز", initial = "ز", middle = "ﺰ", final = "ﺰ"},
-		["س"] = {isolated = "س", initial = "ﺳ", middle = "ﺴ", final = "ﺲ"},
-		["ش"] = {isolated = "ش", initial = "ﺷ", middle = "ﺸ", final = "ﺶ"},
-		["ص"] = {isolated = "ص", initial = "ﺻ", middle = "ﺼ", final = "ﺺ"},
-		["ض"] = {isolated = "ض", initial = "ﺿ", middle = "ﻀ", final = "ﺾ"},
-		["ط"] = {isolated = "ط", initial = "ﻃ", middle = "ﻂ", final = "ﻂ"},
-		["ظ"] = {isolated = "ظ", initial = "ﻇ", middle = "ﻈ", final = "ﻆ"},
-		["ع"] = {isolated = "ع", initial = "ﻋ", middle = "ﻌ", final = "ﻊ"},
-		["غ"] = {isolated = "غ", initial = "ﻏ", middle = "ﻐ", final = "ﻎ"},
-		["ف"] = {isolated = "ف", initial = "ﻓ", middle = "ﻔ", final = "ﻒ"},
-		["ﻕ"] = {isolated = "ق", initial = "ﻗ", middle = "ﻘ", final = "ﻖ"},
-		["ك"] = {isolated = "ك", initial = "ﻛ", middle = "ﻜ", final = "ﻚ"},
-		["ل"] = {isolated = "ل", initial = "ﻟ", middle = "ﻠ", final = "ﻞ"},
-		["م"] = {isolated = "0", initial = "1", middle = "2", final = "3"},
-		["ن"] = {isolated = "ن", initial = "ﻧ", middle = "ﻨ", final = "ﻦ"},
-		["ه"] = {isolated = "ه", initial = "ﻫ", middle = "ﻬ", final = "ﻪ"},
-		["ي"] = {isolated = "ﻱ", initial = "ﻳ", middle = "ﻴ", final = "ﻮ"},
-		["ة"] = {isolated = "ة", initial = "ة", middle = "ة", final = "ﺔ"},
+   local bytes = strlen(s);
+   local pos = bytes;
+   local char1, char2;
+   local charbytes1, charbytes2;
+   local newstr = "";
+   local position = -1;       -- not specified
+   local prevletter = 0;
 
-		["ﻵ"] = {isolated = "ﻵ", initial = "ﻵ", middle = "ﻶ", final = "ﻶ"},
-		["ﻷ"] = {isolated = "ﻷ", initial = "ﻷ", middle = "ﻸ", final = "ﻸ"},
-		["ﻹ"] = {isolated = "ﻹ", initial = "ﻹ", middle = "ﻺ", final = "ﻺ"},
-		["ﻻ"] = {isolated = "ﻻ", initial = "ﻻ", middle = "ﻼ", final = "ﻼ"},
-		["ﻻ"] = {isolated = "ﻻ", initial = "ﻻ", middle = "ﻼ", final = "ﻼ"},
-		
+   while pos > 0 do
+      c = strbyte(s, pos);
+      while c >= 128 and c <= 191 do
+         pos = pos - 1;
+         c = strbyte(s, pos);
+      end
+      
+      charbytes1 = utf8charbytes(s, pos);
+      char1 = strsub(s, pos, pos + charbytes1 - 1);
 
-		["ء"] = {isolated = "ء", initial = "ﺀ", middle = "ﺀ", final = "ﺀ"},
-		["آ"] = {isolated = "آ", initial = "ﺁ", middle = "ﺂ", final = "ﺂ"},
-		["أ"] = {isolated = "أ", initial = "ﺃ", middle = "ﺄ", final = "ﺄ"},
-		["ؤ"] = {isolated = "ؤ", initial = "ﺆ", middle = "ﺆ", final = "ﺆ"},
-		["إ"] = {isolated = "إ", initial = "إ", middle = "ﺈ", final = "ﺈ"},
-		["ئ"] = {isolated = "ئ", initial = "ﺋ", middle = "ﺌ", final = "ﺊ"},
+      -- modification for Arabic characters
+      local pos2 = pos - 1;      -- find the previous letter
+      if (pos2 > 0) then         -- it's not the end of string
+         c = strbyte(s, pos2);
+         while c >= 128 and c <= 191 do
+            pos2 = pos2 - 1;
+            c = strbyte(s, pos2);
+         end
+         charbytes2 = utf8charbytes(s, pos2);
+         char2 = strsub(s, pos2, pos2 + charbytes2 - 1);
+         if (char2 == " ") then
+            prevletter = 1;      -- space
+         elseif (char2 == "ا") and (char1 ~= "ل") then  
+            prevletter = 3;       -- special letter ALF
+         elseif (char1 == "ا") and (char2 == "ل") then  
+            prevletter = 4;       -- special letter LA
+         else
+            prevletter = 2;      -- normal letter
+         end
+      else
+         prevletter = 0;         -- no more letters
+      end
 
-        -- add more reshaping rules for other Arabic characters here
-    }
+      if (position < 0) then     -- not specified yet
+         if ((prevletter == 0) or (prevletter == 1)) then    -- end of file or space on previous letter
+            position = 0;           -- isolated letter
+         else
+            position = 3;           -- final letter
+         end
+      elseif (prevletter == 3) then
+         position = 1;              -- initial letter after ا ALF letter
+      elseif (prevletter == 4) then
+         char1 = "ﻻ";               -- combined letter ا ALF + ل LAM = ﻻ LA
+         position = 0;              -- letter ﻻ LA in initial form
+         pos = pos - charbytes2;    -- we omit the preceding letter ل LAM
+      elseif ((position == 3) or (position == 2)) then       -- it was final or middle letter
+         if ((prevletter == 0) or (prevletter == 1)) then    -- end of file or space on next letter
+            position = 1;           -- initial letter
+         else
+            position = 2;           -- middle letter
+         end         
+      elseif ((position == 0) or (position == 1)) then       -- it was isolated or initial letter
+         position = -1;
+      end
 
-    local bytes = strlen(s)
-    local pos = bytes
-    local charbytes
-    local newstr = ""
-	    
-	local	middle_index = math.floor(bytes / 2)-- Calculate the middle index
-	local	first_letter = string.sub(s, 1, 1)-- Extract the first letter using the string.sub() function
-	local	middle_letter = string.sub(s, middle_index, middle_index)-- Extract the middle letter using the string.sub() function
-	local	last_letter = string.sub(s, -1, -1)-- Extract the last letter using the string.sub() function
+      -- check if the character has reshaping rules
+      local rules = reshaping_rules[char1];
+      if (rules) then
+         -- apply reshaping rules based on the character's position in the string
+         if (position == 0) then       -- isolated letter
+            newstr = newstr .. rules.isolated;
+         elseif (position == 1) then   -- initial letter
+            newstr = newstr .. rules.initial;
+         elseif (position == 2) then   -- middle letter
+            newstr = newstr .. rules.middle;
+         else                          -- final letter
+            newstr = newstr .. rules.final;
+         end
+      else  -- character has no reshaping rules, add it to the result string as is
+         newstr = newstr .. char1;
+      end
 
-    while pos > 0 do
-        c = strbyte(s, pos)
-        while c >= 128 and c <= 191 do
-            pos = pos - 1
-            c = strbyte(s, pos)
-        end
+      pos = pos - 1;
+   end
 
-        charbytes = utf8charbytes(s, pos)
-        local char = strsub(s, pos, pos + charbytes - 1)
-
-        -- check if the character has reshaping rules
-        local rules = reshaping_rules[char]
-        if rules then
-			-- Check if the character is the first or last in the word
-			local word_start = s:find("%S", pos)
-			local word_end = s:find("%S", pos + charbytes)
-			if pos == word_start and pos + charbytes ~= word_end then
-				-- character is the first in the word
-				newstr = newstr .. rules.initial
-			  elseif pos ~= word_start and pos + charbytes == word_end then
-				-- character is the last in the word
-				newstr = newstr .. rules.final
-			  else
-				-- character is in the middle of the word
-				newstr = newstr .. rules.middle
-			end
-			  
-		  else
-			-- character has no reshaping rules, add it to the result string as is
-			newstr = newstr .. char
-		  end
-
-        pos = pos - 1
-    end
-
-    return newstr
+   return newstr;
 end
 
 
